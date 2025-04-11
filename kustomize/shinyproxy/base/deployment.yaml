@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shinyproxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shinyproxy
+  template:
+    metadata:
+      labels:
+        app: shinyproxy
+    spec:
+      serviceAccountName: shinyproxy-sa  # Add this line
+      containers:
+      - name: shinyproxy
+        image: openanalytics/shinyproxy:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_CONFIG_LOCATION
+          value: /opt/shinyproxy/application.yml
+        volumeMounts:
+        - name: config
+          mountPath: /opt/shinyproxy/application.yml
+          subPath: application.yml
+      volumes:
+      - name: config
+        configMap:
+          name: shinyproxy-config

@@ -1,0 +1,23 @@
+version: '3'
+services:
+  minikube-setup:
+    build: .
+    privileged: true
+    environment:
+      - MOUNT_DIR=${MOUNT_DIR}
+      - ARCH=${ARCH}
+    volumes:
+      - ${MOUNT_DIR}:${MOUNT_DIR}
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .kube:/root/.kube
+    ports:
+      - "8443:8443"
+      - "80:80"
+      - "443:443"
+      - "30080:30080"
+    networks:
+      - minikube-net
+
+networks:
+  minikube-net:
+    driver: bridge

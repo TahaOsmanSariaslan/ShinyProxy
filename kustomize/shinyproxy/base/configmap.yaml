@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shinyproxy-config
+data:
+  application.yml: |
+    proxy:
+      title: ShinyProxy
+      port: 8080
+      authentication: none
+      container-backend: kubernetes
+      kubernetes:
+        internal-networking: true
+      specs:
+      - id: 01_hello
+        display-name: Hello Application
+        container-image: openanalytics/shinyproxy-demo
+        container-cmd: ["R", "-e", "shinyproxy::run_01_hello()"]
