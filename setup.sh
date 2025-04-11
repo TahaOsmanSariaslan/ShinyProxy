@@ -124,7 +124,7 @@ minikube start -p minikube-cluster \
     --container-runtime=containerd \
     --base-image="gcr.io/k8s-minikube/kicbase:v0.0.37" \
     --addons=dashboard,metrics-server,ingress \
-    --ports=30080,8443,80,443 \
+    --ports=30080,8443,80,443,30000 \
     --mount-string="${MOUNT_DIR}:${MOUNT_DIR}" \
     --mount
 
@@ -146,7 +146,7 @@ deploy_shinyproxy() {
     kubectl create namespace shinyproxy
     
     # Apply kustomize configuration
-    kubectl apply -k ./kustomize/shinyproxy/base -n shinyproxy
+    kubectl apply -k ./shinyproxy -n shinyproxy
     
     # Wait for deployment
     print_message "Waiting for ShinyProxy deployment to be ready..."
@@ -166,6 +166,101 @@ deploy_shinyproxy() {
 
 # Deploy ShinyProxy
 deploy_shinyproxy
+
+# verify_dashboard_access() {
+#     print_message "Verifying Kubernetes Dashboard access..."
+    
+#     # Get dashboard URL and token
+#     DASHBOARD_URL=$(minikube dashboard -p minikube-cluster --url)
+    
+#     if [ $? -eq 0 ]; then
+#         print_message "Kubernetes Dashboard is accessible at: ${DASHBOARD_URL}"
+        
+#         # Get dashboard token
+#         print_message "Getting dashboard token..."
+#         TOKEN=$(kubectl -n kubernetes-dashboard create token kubernetes-dashboard)
+#         print_message "Dashboard Token: ${TOKEN}"
+#     else
+#         print_error "Failed to get dashboard URL"
+#         return 1
+#     fi
+# }
+
+test_container_communication() {
+    print_message "Testing container communication..."
+
+    # Create test namespace
+    kubectl create namespace test-communication
+
+    # Deploy test pods
+    cat <<EOF | kubectl apply -f - -n test-communication
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod-1
+  labels:
+    app: test-pod-1
+spec:
+  containers:
+  - name: nginx
+    image: nginx:alpine
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod-2
+  labels:
+    app: test-pod-2
+spec:
+  containers:
+  - name: busybox
+    image: busybox
+    command: ['sh', '-c', 'while true; do sleep 3600; done']
+EOF
+
+    # Wait for pods to be ready
+    print_message "Waiting for test pods to be ready..."
+    kubectl wait --for=condition=ready pod -l app=test-pod-1 -n test-communication --timeout=120s
+    kubectl wait --for=condition=ready pod -l app=test-pod-2 -n test-communication --timeout=120s
+
+    # Create service for test-pod-1
+    cat <<EOF | kubectl apply -f - -n test-communication
+apiVersion: v1
+kind: Service
+metadata:
+  name: test-service-1
+spec:
+  selector:
+    app: test-pod-1
+  ports:
+  - port: 80
+    targetPort: 80
+EOF
+
+    # Test communication between pods
+    print_message "Testing pod-to-pod communication..."
+    if kubectl exec -n test-communication test-pod-2 -- wget -q -O- --timeout=5 test-service-1; then
+        print_message "Pod-to-pod communication successful!"
+    else
+        print_error "Pod-to-pod communication failed"
+    fi
+
+    # Test DNS resolution
+    print_message "Testing DNS resolution..."
+    if kubectl exec -n test-communication test-pod-2 -- nslookup kubernetes.default; then
+        print_message "DNS resolution successful!"
+    else
+        print_error "DNS resolution failed"
+    fi
+
+    # Clean up test namespace
+    print_message "Cleaning up test resources..."
+    kubectl delete namespace test-communication
+}
+
+# Add these calls after deploy_shinyproxy
+# verify_dashboard_access
+test_container_communication
 
 verify_shinyproxy_access() {
     print_message "Verifying ShinyProxy access..."
