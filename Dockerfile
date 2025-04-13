@@ -20,7 +20,7 @@ WORKDIR /app
 # Copy setup script and kustomize directory
 COPY setup.sh /usr/local/bin/setup.sh
 COPY shinyproxy/ ./shinyproxy/
-
+COPY .env .env
 # Set permissions
 RUN chmod +x /usr/local/bin/setup.sh
 

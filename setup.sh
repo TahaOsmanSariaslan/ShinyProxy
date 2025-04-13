@@ -112,6 +112,8 @@ check_and_delete_minikube
 
 # Start minikube
 print_message "Starting minikube cluster..."
+
+# Then start minikube
 minikube start -p minikube-cluster \
     --driver=docker \
     --force \
@@ -123,10 +125,20 @@ minikube start -p minikube-cluster \
     --apiserver-port=8443 \
     --container-runtime=containerd \
     --base-image="gcr.io/k8s-minikube/kicbase:v0.0.37" \
-    --addons=dashboard,metrics-server,ingress \
+    --addons=dashboard,metrics-server,ingress,default-storageclass,storage-provisioner \
+    --dns-proxy=true \
+    --embed-certs=true \
     --ports=30080,8443,80,443,30000 \
     --mount-string="${MOUNT_DIR}:${MOUNT_DIR}" \
-    --mount
+    --mount \
+    --cni=calico \
+    --network-plugin=cni
+    # --extra-config=kubelet.resolv-conf=/run/systemd/resolve/resolv.conf
+
+# Wait for cluster to be ready
+print_message "Waiting for cluster to be ready..."
+minikube status -p minikube-cluster
+
 
 # Update kubeconfig
 mkdir -p "$HOME/.kube"
@@ -167,24 +179,6 @@ deploy_shinyproxy() {
 # Deploy ShinyProxy
 deploy_shinyproxy
 
-# verify_dashboard_access() {
-#     print_message "Verifying Kubernetes Dashboard access..."
-    
-#     # Get dashboard URL and token
-#     DASHBOARD_URL=$(minikube dashboard -p minikube-cluster --url)
-    
-#     if [ $? -eq 0 ]; then
-#         print_message "Kubernetes Dashboard is accessible at: ${DASHBOARD_URL}"
-        
-#         # Get dashboard token
-#         print_message "Getting dashboard token..."
-#         TOKEN=$(kubectl -n kubernetes-dashboard create token kubernetes-dashboard)
-#         print_message "Dashboard Token: ${TOKEN}"
-#     else
-#         print_error "Failed to get dashboard URL"
-#         return 1
-#     fi
-# }
 
 test_container_communication() {
     print_message "Testing container communication..."
@@ -204,6 +198,10 @@ spec:
   containers:
   - name: nginx
     image: nginx:alpine
+    command:
+    - /bin/sh
+    - -c
+    - "apk add --no-cache bind-tools && nginx -g 'daemon off;'"
 ---
 apiVersion: v1
 kind: Pod
@@ -217,6 +215,10 @@ spec:
     image: busybox
     command: ['sh', '-c', 'while true; do sleep 3600; done']
 EOF
+
+    # Verify CoreDNS is running
+    print_message "Verifying CoreDNS..."
+    kubectl wait --for=condition=ready pod -l k8s-app=kube-dns -n kube-system --timeout=120s
 
     # Wait for pods to be ready
     print_message "Waiting for test pods to be ready..."
@@ -247,19 +249,14 @@ EOF
 
     # Test DNS resolution
     print_message "Testing DNS resolution..."
-    if kubectl exec -n test-communication test-pod-2 -- nslookup kubernetes.default; then
+    if kubectl exec -n test-communication test-pod-1 -- nslookup kubernetes.default; then
         print_message "DNS resolution successful!"
     else
         print_error "DNS resolution failed"
     fi
 
-    # Clean up test namespace
-    print_message "Cleaning up test resources..."
-    kubectl delete namespace test-communication
 }
 
-# Add these calls after deploy_shinyproxy
-# verify_dashboard_access
 test_container_communication
 
 verify_shinyproxy_access() {
