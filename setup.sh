@@ -148,7 +148,7 @@ minikube start -p minikube-cluster \
     --mount-string="${MOUNT_DIR}:${MOUNT_DIR}" \
     --mount \
     --cni=calico \
-    --network-plugin=calico
+    --network-plugin=cni
 
 # Wait for cluster to be ready
 print_message "Waiting for cluster to be ready..."
