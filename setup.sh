@@ -75,9 +75,24 @@ esac
 
 print_message "Using architecture: ${ARCH}"
 
+check_docker() {
+    echo "Checking Docker..."
+    if ! docker info > /dev/null 2>&1; then
+        print_error "Error: Docker is not available
+        Docker socket: $(ls -l /var/run/docker.sock)
+        Docker context: $DOCKER_CONTEXT
+        Docker host: $DOCKER_HOST"
+        return 1
+    fi
+    print_message "Docker is available"
+    return 0
+}
+check_docker || exit 1
+sudo chmod 666 /var/run/docker.sock
+
 # Check and install kubectl
 if command_exists kubectl; then
-    print_message "kubectl is already installed. Version: $(kubectl version --client --short)"
+    print_message "kubectl is already installed. Version: $(kubectl version --client)"
 else
     print_message "Installing kubectl..."
     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/${ARCH}/kubectl"
@@ -111,7 +126,9 @@ fi
 check_and_delete_minikube
 
 # Start minikube
+
 print_message "Starting minikube cluster..."
+
 
 # Then start minikube
 minikube start -p minikube-cluster \
@@ -128,12 +145,10 @@ minikube start -p minikube-cluster \
     --addons=dashboard,metrics-server,ingress,default-storageclass,storage-provisioner \
     --dns-proxy=true \
     --embed-certs=true \
-    --ports=30080,8443,80,443,30000 \
     --mount-string="${MOUNT_DIR}:${MOUNT_DIR}" \
     --mount \
     --cni=calico \
-    --network-plugin=cni
-    # --extra-config=kubelet.resolv-conf=/run/systemd/resolve/resolv.conf
+    --network-plugin=calico
 
 # Wait for cluster to be ready
 print_message "Waiting for cluster to be ready..."

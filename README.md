@@ -15,6 +15,7 @@ A reproducible local Kubernetes cluster using Minikube inside a Docker container
 ## Prerequisites
 
 - Docker Desktop (macOS/Windows) or Docker Engine (Linux)
+- Colima (macOS, optional instead of Docker Desktop)
 - Docker Compose
 - Minimum 4GB RAM, 2 CPU cores
 
