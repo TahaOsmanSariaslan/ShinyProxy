@@ -146,6 +146,7 @@ minikube start -p minikube-cluster \
     --dns-proxy=true \
     --embed-certs=true \
     --mount-string="${MOUNT_DIR}:${MOUNT_DIR}" \
+    --ports=30080,8443,80,443,30000 \
     --mount \
     --cni=calico \
     --network-plugin=cni
